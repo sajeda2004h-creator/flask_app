@@ -1,0 +1,47 @@
+name: SAST - Sonar Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarscan:
+    name: Run SAST (SonarScanner)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run unit tests
+        run: |
+          # run your tests (adjust if you don't use pytest)
+          if command -v pytest >/dev/null 2>&1; then pytest -q || true; fi
+
+      - name: Run Sonar Scanner (Docker)
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+        run: |
+          # pull and run SonarScanner CLI container
+          docker run --rm \
+            -e SONAR_HOST_URL="$SONAR_HOST_URL" \
+            -e SONAR_LOGIN="$SONAR_TOKEN" \
+            -v "$GITHUB_WORKSPACE":/usr/src sonarsource/sonar-scanner-cli \
+            -Dsonar.projectKey="$SONAR_PROJECT_KEY" \
+            -Dsonar.sources=. \
+            -Dsonar.python.version=3.11 \
+            -Dsonar.login="$SONAR_TOKEN"
